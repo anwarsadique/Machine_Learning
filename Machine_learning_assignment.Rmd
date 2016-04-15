@@ -1,0 +1,81 @@
+---
+title: "Machine Learning final assignment"
+author: "AnwarSadique"
+date: "April 14, 2016"
+output: html_document
+---
+#Downloading and loading the files. Please make sure to move #the data to current working folder after downloading... The #below code to read.csv will not work if the files are not in #current working directory.
+```{r}
+#download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", method = 'curl')
+#download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", method = 'curl')
+rawDataTrain <- read.csv("pml-training.csv")
+rawDataTest <- read.csv("pml-testing.csv")
+dim(rawDataTrain); dim(rawDataTest)
+```
+
+#The amount of predictors are 160 which is too much. In an #effort to bring the numbers to down we will look at #predictors with lots of missing values and predictors with #very low variability. First i am checking predictors with low #variability using caret package nearzerovar function.
+```{r}
+library(caret)
+rawDataTrain1 <- rawDataTrain[,-nearZeroVar(rawDataTrain)]
+```
+
+#Next I am going to check for missing values. I added missing #values of all remaining columns using sapply funciton, which #is 100 columns after eliminating the low variance columns.
+```{r}
+countNA <- sapply(rawDataTrain1, function(x) sum(is.na(x)) )
+table(countNA)
+```
+#It is clear from the table function that there are 59 columns #with 0 NA values and 41 columns with 19216 NA values. 19216 #is approximately 97% of the total rows. All these columns can #be eliminated because 97% of all the value in those columns #are NA's.
+
+```{r}
+rawDataTrain2 <- rawDataTrain1[,countNA==0]
+names(rawDataTrain2)
+```
+
+#Looking at the remaining columns it is clear that columns #with index which is column1 and columns 2,3,4,5 which has #date value of the data collected are not features. These are #information they might have entered when they collected the #dataset. Those columns are going to be eliminated from the #model building.
+```{r}
+training <- rawDataTrain2[,-c(1,2,3,4,5)]
+remove("rawDataTrain1"); remove("rawDataTrain2");
+
+```
+
+#Doing the same for test data for the 20 questions to answer at the end of this assignment.
+```{r}
+rawDataTest1 <- rawDataTest[,-nearZeroVar(rawDataTrain)]
+rawDataTest2 <- rawDataTest1[,countNA==0]
+testData <- rawDataTest2[,-c(1,2,3,4,5)]
+remove("rawDataTest1"); remove("rawDataTest2")
+
+```
+
+#I am going to use random forest to build the model. I will #partition the training and test data using 70% limit. I am #also going to do principle component analysis to reduce the #number of factors as 54 factors are way too much. 
+
+```{r}
+library(randomForest)
+inTrain <- createDataPartition(training$classe, p=0.7, list=FALSE)
+finalTrain <- training[inTrain,]
+finalTest <- training[-inTrain,]
+prProc <- preProcess(finalTrain[,-54], method = "pca", thresh=0.95)
+pcaTrain <- predict(prProc, finalTrain[,-54])
+rf <- randomForest(finalTrain$classe~., data = pcaTrain, verbose=TRUE, ntree=500)
+print(rf)
+
+```
+#Now I will use test data to predict the training model. First #preprocess using the pcamodel of training data
+
+```{r}
+pcatest <- predict(prProc, finalTest[,-54])
+confusionMatrix(finalTest$classe, predict(rf, pcatest))
+
+```
+#Now the final part is to predict the 20 differnt cases. We #need to do all preprocessing we did to the training set to #the 20 question set.
+
+```{r}
+
+pcaTestData <- predict(prProc, testData[,-54])
+testData$classe <- predict(rf, pcaTestData)
+testData$classe
+
+```
+
+
+
